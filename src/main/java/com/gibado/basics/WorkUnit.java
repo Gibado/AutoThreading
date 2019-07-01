@@ -10,6 +10,8 @@ public class WorkUnit implements Runnable {
     private long startTime;
     private long totalTime;
 
+    public List<WorkUnit> getDependents() { return dependents; }
+
     /**
      * Updates and returns the latest state of this {@link WorkUnit}.
      * @return Returns the current state of this {@link WorkUnit}.
