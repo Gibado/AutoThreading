@@ -18,9 +18,9 @@ public class ReadOnlySharable<T> extends Sharable<T> {
 	 * @return Returns the object value
 	 */
 	@Override
-	public synchronized T claim() {
-		T value = super.claim();
-		this.release();
+	public synchronized T claim(WorkUnit workUnit) {
+		T value = super.claim(workUnit);
+		this.release(workUnit);
 		return value;
 	}
 }

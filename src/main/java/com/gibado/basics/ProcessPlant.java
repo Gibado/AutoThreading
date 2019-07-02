@@ -1,16 +1,21 @@
 package com.gibado.basics;
 
-import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import static com.gibado.basics.WorkUnit.State;
 
+/**
+ * Object to initiate {@link WorkUnit} tasks
+ */
 public class ProcessPlant {
-	private Stack<WorkUnit> workStack = new Stack<WorkUnit>(); // TODO change this to a tree structure so that WorkUnits don't get stuck behind unrelated ones.
-	private ExecutorService pool;
-	private static final List<WorkUnit> EMPTY_LIST = new ArrayList<WorkUnit>();
+	private ThreadPoolExecutor pool;
 
+	/**
+	 * Creates a Process plant that will attempt to run as many {@link WorkUnit}s concurrently as possible.
+	 * @param threadCount Maximum number of {@link WorkUnit}s to process at one time
+	 */
 	public ProcessPlant(int threadCount) {
-		pool = Executors.newFixedThreadPool(threadCount);
+		pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadCount);
 	}
 
 	/**
@@ -18,30 +23,38 @@ public class ProcessPlant {
 	 * @param workUnit {@link WorkUnit} to process
 	 */
 	public void queueWorkUnit(WorkUnit workUnit) {
+        workUnit.setProcessPlant(this);
 		if (State.READY.equals(workUnit.updateState())) {
-			pool.submit(workUnit);
+			// This WorkUnit is ready to start working
+			pool.execute(workUnit);
 		} else {
-
-			workStack.push(workUnit);
-
-			Queue<WorkUnit> needToQueue = new LinkedList<WorkUnit>(workUnit.getDependents());
-			while (!needToQueue.isEmpty()) {
-				needToQueue.addAll(broadQueue(needToQueue.poll()));
+			// This WorkUnit needs other WorkUnit(s) to be done first
+			for (WorkUnit dependent : workUnit.getDependents()) {
+				// Check if any of the dependents are ready
+				queueWorkUnit(dependent);
 			}
 		}
 	}
 
 	/**
-	 * Queues up dependent {@link WorkUnit}s using a broad search as apposed to a deep search.
-	 * @param workUnit {@link WorkUnit} to queue up
-	 * @return Returns the dependent {@link WorkUnit}s of the given {@link WorkUnit}.
+	 * Checks if a parent {@link WorkUnit} was waiting on this {@link WorkUnit} that is now done processing. If a parent
+	 * {@link WorkUnit} exists then this will begin attempting to process the parent {@link WorkUnit}
+	 * @param workUnit {@link WorkUnit} that has finished processing
 	 */
-	private List<WorkUnit> broadQueue(WorkUnit workUnit) {
-		if (!State.READY.equals(workUnit.updateState())) {
-			workStack.push(workUnit);
-			return workUnit.getDependents();
+	protected void signalComplete(WorkUnit workUnit) {
+	    WorkUnit parent = workUnit.getParent();
+	    // If there's no parent then this line of work is done
+        if(parent != null) {
+            State parentState = parent.updateState();
+		    if (State.ERROR.equals(workUnit.updateState())) {
+		    	// This will cascade the Error state up this line of work
+                signalComplete(parent);
+		    } else {
+		        if (!parent.isThreadClaimed() && (State.READY.equals(parentState) || State.WAITING_RESOURCE.equals(parentState))) {
+		        	// Starts working on the parent WorkUnit
+                    pool.execute(parent);
+                }
+            }
 		}
-		pool.submit(workUnit);
-		return EMPTY_LIST;
 	}
 }

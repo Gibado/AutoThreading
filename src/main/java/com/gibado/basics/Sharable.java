@@ -20,7 +20,7 @@ public class Sharable<T> {
 	 * Returns true if this {@link Sharable} is currently claimed by a thread and is not available to be edited
 	 * @return Returns true if this {@link Sharable} is currently claimed by a thread and is not available to be edited
 	 */
-	public synchronized boolean isLocked() {
+	protected synchronized boolean isLocked() {
 		return claimed != null;
 	}
 
@@ -42,9 +42,17 @@ public class Sharable<T> {
 	 * Releases the claim on this {@link Sharable} so that other threads can access this again.
      * @param workUnit Must be the original {@link WorkUnit} that claimed this {@link Sharable}
 	 */
-	public synchronized void release(WorkUnit workUnit) {
+	protected synchronized void release(WorkUnit workUnit) {
 	    if (claimed.equals(workUnit)) {
 	        claimed = null;
         }
 	}
+
+	public String toString() {
+	    String str = "";
+	    if (claimed != null) {
+	        str = claimed.toString();
+        }
+	    return str + value.toString();
+    }
 }
