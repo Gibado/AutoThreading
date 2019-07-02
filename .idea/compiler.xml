@@ -10,7 +10,7 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="AutoThreading" target="1.5" />
+      <module name="AutoThreading" target="8" />
     </bytecodeTargetLevel>
   </component>
 </project>
