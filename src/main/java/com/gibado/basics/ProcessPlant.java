@@ -2,6 +2,7 @@ package com.gibado.basics;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+
 import static com.gibado.basics.WorkUnit.State;
 
 /**
@@ -9,6 +10,7 @@ import static com.gibado.basics.WorkUnit.State;
  */
 public class ProcessPlant {
 	private ThreadPoolExecutor pool;
+	private long timeout = -1; // TODO Add in timeout option
 
 	/**
 	 * Creates a Process plant that will attempt to run as many {@link WorkUnit}s concurrently as possible.
@@ -27,6 +29,19 @@ public class ProcessPlant {
 		if (State.READY.equals(workUnit.updateState())) {
 			// This WorkUnit is ready to start working
 			pool.execute(workUnit);
+
+			if (workUnit.getParent() != null) {
+				State workUnitState = workUnit.updateState();
+				while (!State.ERROR.equals(workUnitState) && !State.DONE.equals(workUnit.updateState())) {
+					try {
+						// Give the other threads a chance to work
+						Thread.sleep(1);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					workUnitState = workUnit.updateState();
+				}
+			}
 		} else {
 			// This WorkUnit needs other WorkUnit(s) to be done first
 			for (WorkUnit dependent : workUnit.getDependents()) {

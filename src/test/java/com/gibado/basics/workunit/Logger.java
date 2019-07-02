@@ -22,6 +22,14 @@ public class Logger {
     }
 
     /**
+     * Logs a message to the console
+     * @param message Message to log
+     */
+    public static void logToConsole(String message) {
+        System.out.println(message);
+    }
+
+    /**
      * Prints out data for a {@link WorkUnit} tree
      * @param workUnit {@link WorkUnit} root to start with
      */
@@ -39,6 +47,28 @@ public class Logger {
         if (workUnit.getDependents() != null) {
             for (WorkUnit dependent : workUnit.getDependents()) {
                 logWorkUnitTree(prepend + "-", dependent);
+            }
+        }
+    }
+
+    /**
+     * Prints out data for a {@link WorkUnit} tree to the console
+     * @param workUnit {@link WorkUnit} root to start with
+     */
+    public static void logWorkUnitTreeToConsole(WorkUnit workUnit) {
+        logWorkUnitTreeToConsole("", workUnit);
+    }
+
+    /**
+     * Prints out data for a {@link WorkUnit} tree to the console
+     * @param prepend String to note how many levels deep into the tree
+     * @param workUnit {@link WorkUnit} root to start with
+     */
+    private static void logWorkUnitTreeToConsole(String prepend, WorkUnit workUnit) {
+        logToConsole(prepend + workUnit.toString());
+        if (workUnit.getDependents() != null) {
+            for (WorkUnit dependent : workUnit.getDependents()) {
+                logWorkUnitTreeToConsole(prepend + "-", dependent);
             }
         }
     }
