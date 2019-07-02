@@ -31,3 +31,13 @@ This is a singleton object that will take a WorkUnit, queue up the work, and ret
 
 **A Sharable:**
 Some objects need to be shared between WorkUnits.  This is a wrapper to protect those object from deadlock and collisions.
+
+#How to Implement this Framwork in your Code
+* Extend the `WorkUnit` for simple tasks that are to be completed.
+    * This will have the best results if you do this around tasks that can be done in parallel
+    * Be sure to pass variables into your `WorkUnit` by using the `Sharable` wrapper object.
+        * A `ReadOnlySharable` wrapper has also been included for passing in objects won't be altered while performing the task.
+* After `WorkUnits` have been defined make sure they are linked together using `WorkUnit.setDependents()` where the dependents are `WorkUnits` that need to be completed before processing this `WorkUnit`.
+    * I recommend thinking about the last `WorkUnit` to be processed as the *outcome `WorkUnit`* and assigning `WorkUnits` to it that are required to be completed beforehand.
+        * Example: (Check in at work) *outcome `WorkUnit`* < (Drive to work) < (Get dressed)
+* Now that your `WorkUnits` are organized correctly you can queue the *outcome `WorkUnit`* to be processed by the `ProcessPlant` via the `ProcessPlant.queueWorkUnit()`.
