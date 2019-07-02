@@ -2,6 +2,7 @@ package com.gibado.basics;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,14 +11,17 @@ import java.util.Map;
  * This object represents a single unit of work.
  */
 public abstract class WorkUnit implements Runnable {
+    private String name = "Default WorkUnit";
     private State state;
     private WorkUnit parent;
     private List<WorkUnit> dependents;
     private Map<String, Sharable<?>> requiredMap;
     private Instant startTime = null;
+    private long taskTime = -1;
     private long totalTime = -1;
-    private long timeout = -1; // TODO add in option to timeout while waiting for required Sharable(s)
+    private long timeout = -1;
     private ProcessPlant processPlant;
+    private Exception exceptionThrown;
 
     /**
      * Creates a one off task
@@ -51,6 +55,26 @@ public abstract class WorkUnit implements Runnable {
     }
 
     /**
+     * Defines how long is acceptable to wait for {@link Sharable} resources.
+     * @param milliseconds Time in milliseconds
+     */
+    public void setTimeout(long milliseconds) {
+        this.timeout = milliseconds;
+    }
+
+    /**
+     * Returns the name of this {@link WorkUnit}
+     * @return Returns the name of this {@link WorkUnit}
+     */
+    public String getName() { return name; }
+
+    /**
+     * Gives this {@link WorkUnit} a name
+     * @param name Name to refer to this {@link WorkUnit} as
+     */
+    public void setName(String name) { this.name = name; }
+
+    /**
      * Returns all {@link WorkUnit}s this is dependent on
      * @return Returns all {@link WorkUnit}s this is dependent on
      */
@@ -65,6 +89,14 @@ public abstract class WorkUnit implements Runnable {
         for (WorkUnit dependent : dependents) {
             dependent.setParent(this);
         }
+    }
+
+    /**
+     * Assigns dependents to this {@link WorkUnit} that must be completed before this {@link WorkUnit} can begin
+     * @param dependents {@link WorkUnit}s that must be completed before this {@link WorkUnit} can begin
+     */
+    public void setDependents(WorkUnit ... dependents) {
+        setDependents(Arrays.asList(dependents));
     }
 
     /**
@@ -120,32 +152,33 @@ public abstract class WorkUnit implements Runnable {
      * Updates and returns the latest state of this {@link WorkUnit}.
      * @return Returns the current state of this {@link WorkUnit}.
      */
-    protected State updateState() {
+    protected synchronized State updateState() {
         if (State.DONE.equals(state) || State.ERROR.equals(state)) {
             // Task has already been attempted or completed
             return state;
         }
         // Check for dependents have to be completed
         if (dependents != null) {
-            for (WorkUnit dependent : dependents) {
-                State dependentState = dependent.updateState();
-                switch (dependentState) {
-                    case WAITING_DEPENDENT:
-                    case WAITING_RESOURCE:
-                    case READY:
-                    case INITIATED:
-                    case IN_PROGRESS:
-                        // Wait for all dependents to be done
-                        state = State.WAITING_DEPENDENT;
-                        return state;
-                    case ERROR:
-                        // If a dependent found an error then this task cannot be processed
-                        state = State.ERROR;
-                        return state;
-                    case DONE:
-                        // This dependent is done
-                        break;
-                }
+            // See if we care about any dependent states
+            State dependentState = getHighestPriorityState(dependents);
+
+            switch (dependentState) {
+                case WAITING_DEPENDENT:
+                case WAITING_RESOURCE:
+                case READY:
+                case INITIATED:
+                case IN_PROGRESS:
+                    // Wait for all dependents to be done
+                    state = State.WAITING_DEPENDENT;
+                    return state;
+                case ERROR:
+                    // If a dependent found an error then this task cannot be processed
+                    state = State.ERROR;
+                    exceptionHandling(exceptionThrown, null);
+                    return state;
+                case DONE:
+                    // This dependent is done
+                    break;
             }
         }
         // Check if resources are available
@@ -157,6 +190,38 @@ public abstract class WorkUnit implements Runnable {
         // Nothing in the way of starting this task
         state = State.READY;
         return state;
+    }
+
+    /**
+     * Finds the most important {@link State} held by one of the dependents
+     * @param dependents {@link WorkUnit}s to check
+     * @return Returns the highest importance {@link State} held by one of the dependents
+     */
+    private State getHighestPriorityState(final List<WorkUnit> dependents) {
+        State result = State.DONE;
+        for (WorkUnit dependent : dependents) {
+            State dependentState = dependent.updateState();
+            switch (dependentState) {
+                case WAITING_DEPENDENT:
+                case WAITING_RESOURCE:
+                case READY:
+                case INITIATED:
+                case IN_PROGRESS:
+                    // Wait for all dependents to be done
+                    if (dependentState.compareTo(result) > 0) {
+                        result = dependentState;
+                    }
+                    break;
+                case ERROR:
+                    // If a dependent found an error then this task cannot be processed
+                    exceptionThrown = dependent.exceptionThrown;
+                    return State.ERROR;
+                case DONE:
+                    // This dependent is done
+                    break;
+            }
+        }
+        return result;
     }
 
     /**
@@ -182,20 +247,29 @@ public abstract class WorkUnit implements Runnable {
      */
     public abstract void performTask(Map<String, ?> params);
 
+    /**
+     * This method is called if an exception occurs during the performTask method before the exception is thrown again
+     * @param exception Exception that was thrown during the performTask method
+     * @param params {@link Map} containing values based on the {@link Sharable} added to this {@link WorkUnit}
+     */
+    public void exceptionHandling(Exception exception, Map<String, ?> params) {}
+
     public final void run() {
         // Check if this task has already been done
         if (State.DONE.equals(state)) {
             return;
         }
         startTime = Instant.now();
+        long elapsedTime = Duration.between(startTime, Instant.now()).toMillis();
         state = State.INITIATED;
+        Map<String, Object> params = null;
         try {
             boolean workDone = false;
-            while (!workDone) {
+            while (!workDone && (timeout ==-1 || elapsedTime < timeout)) {
                 // Check if Sharables are available
                 if (areRequiredAvailable()) {
                     // claim Sharables
-                    Map<String, Object> params = claimAllRequired();
+                    params = claimAllRequired();
                     // check if we got the requiredMap
                     if (!containsNull(params)) {
                         state = State.IN_PROGRESS;
@@ -206,18 +280,44 @@ public abstract class WorkUnit implements Runnable {
                     // release requiredMap for others to use
                     releaseAll();
                 }
+                elapsedTime = Duration.between(startTime, Instant.now()).toMillis();
+            }
+            if (!workDone) {
+                // Timeout reached
+                throw new IllegalStateException("Could not grab required Sharable(s) in time: " + requiredMapToString(requiredMap));
             }
         } catch (Exception e) {
+            this.exceptionThrown = e;
             state = State.ERROR;
+            exceptionHandling(e, params);
             throw e;
         } finally {
             // Make sure Sharables have been released
             releaseAll();
+            // Update times
             Instant endTime = Instant.now();
-            totalTime = Duration.between(startTime, endTime).toMillis();
+            taskTime = Duration.between(startTime, endTime).toMillis();
+            totalTime = taskTime + getTotalDependentTime();
             // Call back to trigger parent WorkUnit
             signalEnd();
         }
+    }
+
+    /**
+     * Converts a {@link Sharable} {@link Map} into a String
+     * @param requiredMap A {@link Map} of String, {@link Sharable}
+     * @return Returns a {@link Map} of String, {@link Sharable} into a String for logging
+     */
+    private String requiredMapToString(Map<String, Sharable<?>> requiredMap) {
+        StringBuilder sb = new StringBuilder("[");
+        for (Map.Entry<String, Sharable<?>> entry : requiredMap.entrySet()) {
+            if (sb.length() > 1) {
+                sb.append(", ");
+            }
+            sb.append("{").append(entry.getKey()).append(", ").append(entry.getValue().toString()).append("}");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     /**
@@ -266,11 +366,25 @@ public abstract class WorkUnit implements Runnable {
     }
 
     public String toString() {
-        String result = state.toString();
-        if (totalTime > -1) {
-             result += " in " + totalTime + " ms";
+        StringBuilder sb = new StringBuilder(name).append(" - ").append(state);
+        if (taskTime > -1) {
+             sb.append(" in ").append(taskTime).append(" ms (Total: ").append(totalTime).append(" ms)");
         }
-        return result;
+        return sb.toString();
+    }
+
+	/**
+	 * Returns the amount of time the dependents took to complete their tasks as a collective
+	 * @return Returns the amount of time the dependents took to complete their tasks as a collective
+	 */
+	private long getTotalDependentTime() {
+        long dependentTime = 0;
+        if (dependents != null) {
+            for (WorkUnit dependent : dependents) {
+                dependentTime += dependent.getTotalTime();
+            }
+        }
+        return dependentTime;
     }
 
     /**
@@ -280,27 +394,33 @@ public abstract class WorkUnit implements Runnable {
     public long getStartTime() { return startTime.toEpochMilli(); }
 
     /**
-     * Returns how much time was taken to start and perform this task
-     * @return Returns how much time was taken to start and perform this task
+     * Returns how much time in milliseconds was taken to start and perform this task
+     * @return Returns how much time in milliseconds was taken to start and perform this task
+     */
+    public long getTaskTime() { return taskTime; }
+
+    /**
+     * Returns how much time was taken to start and perform this task and all the tasks it depends on
+     * @return Returns how much time was taken to start and perform this task and all the tasks it depends on
      */
     public long getTotalTime() { return totalTime; }
 
     /**
-     * Different states that a {@link WorkUnit} can be in
+     * Different states that a {@link WorkUnit} can be in.  This is ordered by importance.
      */
     public enum State {
-        /** Requires a dependent {@link WorkUnit} to process before continuing */
-        WAITING_DEPENDENT,
-        /** Requires at least 1 more {@link Sharable} resource required for performing the {@link WorkUnit} task */
-        WAITING_RESOURCE,
-        /** {@link WorkUnit} is ready to perform its task */
-        READY,
-        /** {@link WorkUnit} has started attempting to claim its required {@link Sharable} resources */
-        INITIATED,
-        /** {@link WorkUnit} has started performing its task */
-        IN_PROGRESS,
         /** {@link WorkUnit} has finished its task successfully */
         DONE,
+        /** {@link WorkUnit} has started performing its task */
+        IN_PROGRESS,
+        /** {@link WorkUnit} has started attempting to claim its required {@link Sharable} resources */
+        INITIATED,
+        /** {@link WorkUnit} is ready to perform its task */
+        READY,
+        /** Requires at least 1 more {@link Sharable} resource required for performing the {@link WorkUnit} task */
+        WAITING_RESOURCE,
+        /** Requires a dependent {@link WorkUnit} to process before continuing */
+        WAITING_DEPENDENT,
         /** {@link WorkUnit} encountered an error */
         ERROR
     }
