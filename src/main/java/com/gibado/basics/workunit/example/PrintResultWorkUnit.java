@@ -1,7 +1,7 @@
-package com.gibado.basics.workunit;
+package com.gibado.basics.workunit.example;
 
-import com.gibado.basics.Sharable;
-import com.gibado.basics.WorkUnit;
+import com.gibado.basics.sharable.Sharable;
+import com.gibado.basics.workunit.WorkUnit;
 
 import java.util.Collection;
 import java.util.Map;
@@ -13,10 +13,10 @@ public class PrintResultWorkUnit extends WorkUnit {
 	private static final String logKey = "log";
 
 	public PrintResultWorkUnit(Sharable<Logger> logShare, Sharable<?> ... printable) {
-		addRequiredParam(logKey, logShare);
+		addResource(logKey, logShare);
 		int index = 0;
 		for (Sharable<?> resource : printable) {
-			addRequiredParam(String.valueOf(index), resource);
+			addResource(String.valueOf(index), resource);
 			index++;
 		}
 		setName("Print results");

@@ -32,7 +32,7 @@ This is a singleton object that will take a WorkUnit, queue up the work, and ret
 **A Sharable:**
 Some objects need to be shared between WorkUnits.  This is a wrapper to protect those object from deadlock and collisions.
 
-#How to Implement this Framwork in your Code
+#How to Implement this Framework in your Code
 * Extend the `WorkUnit` for simple tasks that are to be completed.
     * This will have the best results if you do this around tasks that can be done in parallel
     * Be sure to pass variables into your `WorkUnit` by using the `Sharable` wrapper object.

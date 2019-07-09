@@ -1,6 +1,7 @@
-package com.gibado.basics.workunit;
+package com.gibado.basics.workunit.example;
 
-import com.gibado.basics.WorkUnit;
+import com.gibado.basics.workunit.ITaskRunner;
+import com.gibado.basics.workunit.WorkUnit;
 
 /**
  * Logs information to the console and tracks this for later
@@ -30,22 +31,22 @@ public class Logger {
     }
 
     /**
-     * Prints out data for a {@link WorkUnit} tree
-     * @param workUnit {@link WorkUnit} root to start with
+     * Prints out data for a {@link ITaskRunner} tree
+     * @param workUnit {@link ITaskRunner} root to start with
      */
-    public void logWorkUnitTree(WorkUnit workUnit) {
+    public void logWorkUnitTree(ITaskRunner workUnit) {
         logWorkUnitTree("", workUnit);
     }
 
     /**
-     * Prints out data for a {@link WorkUnit} tree
+     * Prints out data for a {@link ITaskRunner} tree
      * @param prepend String to note how many levels deep into the tree
-     * @param workUnit {@link WorkUnit} root to start with
+     * @param workUnit {@link ITaskRunner} root to start with
      */
-    private void logWorkUnitTree(String prepend, WorkUnit workUnit) {
+    private void logWorkUnitTree(String prepend, ITaskRunner workUnit) {
         log(prepend + workUnit.toString());
         if (workUnit.getDependents() != null) {
-            for (WorkUnit dependent : workUnit.getDependents()) {
+            for (ITaskRunner dependent : workUnit.getDependents()) {
                 logWorkUnitTree(prepend + "-", dependent);
             }
         }
@@ -55,7 +56,7 @@ public class Logger {
      * Prints out data for a {@link WorkUnit} tree to the console
      * @param workUnit {@link WorkUnit} root to start with
      */
-    public static void logWorkUnitTreeToConsole(WorkUnit workUnit) {
+    public static void logWorkUnitTreeToConsole(ITaskRunner workUnit) {
         logWorkUnitTreeToConsole("", workUnit);
     }
 
@@ -64,10 +65,10 @@ public class Logger {
      * @param prepend String to note how many levels deep into the tree
      * @param workUnit {@link WorkUnit} root to start with
      */
-    private static void logWorkUnitTreeToConsole(String prepend, WorkUnit workUnit) {
+    private static void logWorkUnitTreeToConsole(String prepend, ITaskRunner workUnit) {
         logToConsole(prepend + workUnit.toString());
         if (workUnit.getDependents() != null) {
-            for (WorkUnit dependent : workUnit.getDependents()) {
+            for (ITaskRunner dependent : workUnit.getDependents()) {
                 logWorkUnitTreeToConsole(prepend + "-", dependent);
             }
         }
