@@ -1,7 +1,7 @@
-package com.gibado.basics.workunit;
+package com.gibado.basics.workunit.example;
 
-import com.gibado.basics.Sharable;
-import com.gibado.basics.WorkUnit;
+import com.gibado.basics.sharable.Sharable;
+import com.gibado.basics.workunit.WorkUnit;
 
 import java.util.Map;
 
@@ -9,13 +9,13 @@ import java.util.Map;
  * Appends action text to a {@link StringBuilder}
  */
 public class StringAppendWorkUnit extends WorkUnit {
-	private static final String appenderKey = "body";
+	private static final String appenderKey = "appender";
 	private static final String logKey = "log";
 	private String actionText;
 
 	public StringAppendWorkUnit(String name, String actionText, Sharable<StringBuilder> appendToShare, Sharable<Logger> logShare) {
-		addRequiredParam(appenderKey, appendToShare);
-		addRequiredParam(logKey, logShare);
+		addResource(appenderKey, appendToShare);
+		addResource(logKey, logShare);
 		this.setName(name);
 		this.actionText = actionText;
 	}
@@ -31,4 +31,7 @@ public class StringAppendWorkUnit extends WorkUnit {
 		logger.log(getName());
 		logger.log(appender.toString());
 	}
+
+
+
 }

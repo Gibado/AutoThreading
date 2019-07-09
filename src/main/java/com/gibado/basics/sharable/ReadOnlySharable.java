@@ -1,12 +1,16 @@
-package com.gibado.basics;
+package com.gibado.basics.sharable;
+
+import com.gibado.basics.workunit.ITaskRunner;
 
 /**
  * Represents a {@link Sharable} that is read only so thread protection isn't needed.
  * @param <T> Object type
  */
 public class ReadOnlySharable<T> extends Sharable<T> {
+
 	/**
-	 * An object wrapper that protects a read only object that might be shared between threads
+	 * An object wrapper that protects an object that might be shared between threads
+	 *
 	 * @param value Object that could be used by multiple threads
 	 */
 	public ReadOnlySharable(T value) {
@@ -18,9 +22,9 @@ public class ReadOnlySharable<T> extends Sharable<T> {
 	 * @return Returns the object value
 	 */
 	@Override
-	public synchronized T claim(WorkUnit workUnit) {
-		T value = super.claim(workUnit);
-		this.release(workUnit);
+	public synchronized T claim(ITaskRunner runner) {
+		T value = super.claim(runner);
+		this.release(runner);
 		return value;
 	}
 }
